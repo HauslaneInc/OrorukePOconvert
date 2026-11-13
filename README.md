@@ -2,7 +2,7 @@
 
 Web app that converts O'Rourke Sales purchase-order PDFs (one or many POs per file) into a Sellercloud wholesale order CSV.
 
-**Live app:** https://hauslaneinc.github.io/ororukepoconvert/
+**Live app:** https://hauslaneinc.github.io/OrorukePOconvert/
 
 Everything runs in the browser — PDFs are never uploaded anywhere.
 
