@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PO to Sellercloud CSV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<style>
+  :root{
+    --bg:#f6f5f2; --card:#fff; --ink:#1c1c1a; --muted:#6b6a65; --line:#e4e2dc;
+    --accent:#1f4d3a; --accent-soft:#e3eee8; --ee:#8a4b00; --ee-soft:#fbefdc;
+    --warn:#a12a1f; --warn-soft:#fbe6e3; --ok:#1f6b45;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#151513; --card:#1e1e1b; --ink:#ecebe6; --muted:#9d9b94; --line:#33322e;
+      --accent:#7cc4a0; --accent-soft:#1f3329; --ee:#f0b56a; --ee-soft:#3a2a14; --warn:#f08a7e; --warn-soft:#3b1f1b; --ok:#7cc4a0; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Inter,system-ui,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+  h1{font-size:22px;margin:0 0 4px;letter-spacing:-.01em}
+  .sub{color:var(--muted);margin:0}
+  .drop{border:2px dashed var(--line);border-radius:14px;background:var(--card);padding:34px 20px;text-align:center;cursor:pointer;transition:.15s}
+  .drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+  .drop strong{display:block;font-size:16px;margin-bottom:4px}
+  .drop span{color:var(--muted)}
+  .btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:9px;padding:9px 14px;cursor:pointer}
+  .btn:hover{border-color:var(--ink)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--card)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 14px}
+  .bar .spacer{flex:1}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:7px 12px;color:var(--muted)}
+  .stat b{color:var(--ink)}
+  .stat.bad b{color:var(--warn)}
+  details.settings{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-top:14px}
+  details.settings summary{cursor:pointer;font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:12px}
+  label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+  label.f input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px}
+  .note{font-size:12px;color:var(--muted);margin:10px 0 2px}
+  .po{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
+  .po.has-warn{border-color:var(--warn)}
+  .po-h{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 14px;border-bottom:1px solid var(--line)}
+  .po-h .id{font-family:"JetBrains Mono",monospace;font-weight:500}
+  .po-h .co{font-weight:600}
+  .po-h .src{color:var(--muted);font-size:12px;margin-left:auto}
+  .tag{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
+  .tag.ee{background:var(--ee-soft);color:var(--ee)}
+  .tag.w{background:var(--warn-soft);color:var(--warn)}
+  .warns{margin:0;padding:8px 14px 8px 32px;background:var(--warn-soft);color:var(--warn);font-size:13px}
+  .po-b{display:grid;grid-template-columns:260px 1fr;gap:0}
+  @media (max-width:760px){.po-b{grid-template-columns:1fr}}
+  .addr{padding:10px 14px;border-right:1px solid var(--line);font-size:13px}
+  .addr .k{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-top:6px}
+  .addr .k:first-child{margin-top:0}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--muted);font-weight:500;font-size:12px}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  td.mono{font-family:"JetBrains Mono",monospace;font-size:12.5px}
+  .lines{overflow-x:auto}
+  .lines tr:last-child td{border-bottom:0}
+  .err{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 14px;margin-bottom:10px}
+  .preview{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:420px;margin-top:18px}
+  .preview th{position:sticky;top:0;background:var(--card)}
+  .preview td{font-size:12px}
+  h2{font-size:15px;margin:26px 0 10px}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:9px;font-weight:500;opacity:0;transition:.2s;pointer-events:none}
+  .toast.show{opacity:1}
+  .empty{color:var(--muted);text-align:center;padding:30px 0}
+  textarea.copybox{width:100%;height:140px;font:12px "JetBrains Mono",monospace;margin-top:10px;display:none;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>PO → Sellercloud CSV</h1>
+      <p class="sub">Drop O'Rourke purchase-order PDFs (one or many POs per file). Everything is processed in your browser.</p>
+    </div>
+  </header>
+
+  <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose PDF files">
+    <strong>Drop PDF files here</strong>
+    <span>or click to choose · multiple files OK</span>
+    <input type="file" id="file" accept="application/pdf,.pdf" multiple hidden>
+  </div>
+
+  <details class="settings">
+    <summary>Fixed fields</summary>
+    <p class="note">Applied to every row. Leave blank to export blank, matching the Wholesale template. Saved in this browser only.</p>
+    <div class="grid" id="fixed"></div>
+  </details>
+
+  <div class="bar" id="bar" hidden>
+    <div class="stat"><b id="sFiles">0</b> files</div>
+    <div class="stat"><b id="sPOs">0</b> POs</div>
+    <div class="stat"><b id="sRows">0</b> CSV rows</div>
+    <div class="stat" id="sWarnBox"><b id="sWarn">0</b> need review</div>
+    <div class="spacer"></div>
+    <button class="btn" id="clear">Clear</button>
+    <button class="btn" id="copy">Copy CSV</button>
+    <button class="btn primary" id="dl">Download CSV</button>
+  </div>
+  <textarea class="copybox" id="copybox" readonly></textarea>
+
+  <div id="errors"></div>
+  <div id="list"><p class="empty">No POs loaded yet.</p></div>
+
+  <div id="previewWrap" hidden>
+    <h2>CSV preview</h2>
+    <div class="preview"><table id="preview"></table></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// PO -> Sellercloud CSV parser. Pure functions; input is pdf.js text items per page.
+(function (root) {
+  const HEADERS = ["OrderID","OrderDate","ShipCompanyName","ShipFirstName","ShipLastName","ShipAddress1","ShipAddress2","ShipCity","ShipStateCode","ShipZipCode","ShipCountry","ShipPhone","ShipEmail","BillCompanyName","BillFirstName","BillLastName","BillAddress1","BillAddress2","BillCity","BillStateCode","BillZipCode","BillCountry","BillPhone","BillEmail","ShippingMethodRequested","ShippingCarrierRequested","RushOrder","ProductID","ProductDescription","QtyPurchased","UnitPrice","ShippingCost","Tax","ShipFromWarehouseName","PaymentTerm"];
+
+  const BILL = { BillCompanyName: "O'Rourke Sales Company-DO", BillFirstName: "", BillLastName: "", BillAddress1: "VENDOR DIRECT SHIPMENT", BillAddress2: "", BillCity: "Davenport", BillStateCode: "IA", BillZipCode: "52807", BillCountry: "US", BillPhone: "563-823-3505" };
+  const EE_EMAIL = "wes@electronicexpress.com";
+  const DEALER_EMAIL = "tjeffries@orourkesales.com";
+
+  // Words that appear in product descriptions; used to rejoin words the PDF split ("Mo unt", "C abinet").
+  const VOCAB = new Set(("hauslane inch wall mount under cabinet convertible ducted ductless range hood hoods touch control versa vent " +
+    "insert island pro style dual fuel gas electric stainless steel satin brass black white charcoal filter filters knobs knob handle handles " +
+    "chimney ceiling extension baffle stove oven induction cooktop glass matte gold copper brushed professional ventilation microwave " +
+    "recirculating recirculation liner slim profile duct kit adapter damper remote blower internal external quiet motor lights light panel " +
+    "backsplash warming drawer griddle burner burners convection natural propane conversion accessory accessories bronze nickel chrome silver " +
+    "grey gray navy green blue red mesh aluminum cover transition round rectangular rangehood mounted freestanding slide").split(/\s+/));
+
+  function cleanDescription(s) {
+    let toks = String(s || "").replace(/\s+/g, " ").trim().split(" ");
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let i = 0; i < toks.length - 1; i++) {
+        const a = toks[i], b = toks[i + 1];
+        const joined = (a + b).toLowerCase().replace(/[^a-z]/g, "");
+        if (!/^[A-Za-z]+$/.test(a) || !/^[A-Za-z]+[,.)]?$/.test(b)) continue;
+        if (VOCAB.has(joined) && !(VOCAB.has(a.toLowerCase()) && VOCAB.has(b.toLowerCase().replace(/[^a-z]/g, "")))) {
+          toks.splice(i, 2, a + b); changed = true; break;
+        }
+      }
+    }
+    return toks.join(" ");
+  }
+
+  // Group text items into rows (top to bottom), each row's items sorted left to right.
+  function toRows(items) {
+    const its = items.filter(t => t.str && t.str.trim()).map(t => ({ x: t.x, y: t.y, w: t.w || 0, str: t.str.trim() }));
+    its.sort((a, b) => b.y - a.y || a.x - b.x);
+    const rows = [];
+    for (const it of its) {
+      const r = rows.find(r => Math.abs(r.y - it.y) < 2);
+      if (r) r.items.push(it); else rows.push({ y: it.y, items: [it] });
+    }
+    rows.forEach(r => { r.items.sort((a, b) => a.x - b.x); r.text = r.items.map(i => i.str).join(" "); });
+    rows.sort((a, b) => b.y - a.y);
+    return rows;
+  }
+
+  function find(items, re) { return items.find(t => re.test(t.str.trim())); }
+
+  function labelValue(items, label) {
+    const re = new RegExp("^" + label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$", "i");
+    const lab = find(items, re);
+    if (!lab) return "";
+    const cand = items.filter(t => Math.abs(t.y - lab.y) < 2 && t.x > lab.x + 1 && t.str.trim() && !re.test(t.str.trim()))
+      .sort((a, b) => a.x - b.x);
+    const right = cand.filter(t => t.x < lab.x + 200);
+    return right.length ? right[0].str.trim() : "";
+  }
+
+  const CITY_RE = /^(.+?),\s*([A-Za-z]{2})\.?\s+(\d{5}(?:-\d{4})?)$/;
+
+  function shipToLines(items) {
+    const shipLab = find(items, /^Ship To$/i);
+    const invLab = find(items, /^Invoice to$/i);
+    if (!shipLab) return [];
+    const xMax = invLab ? invLab.x - 3 : shipLab.x + 220;
+    const col = items.filter(t => t.y < shipLab.y - 2 && t.x >= shipLab.x - 3 && t.x < xMax && t.str.trim());
+    const rows = toRows(col);
+    const out = [];
+    let lastY = shipLab.y;
+    for (const r of rows) {
+      if (lastY - r.y > 18) break; // blank gap ends the block
+      if (/^(Line|Product)\b/i.test(r.text)) break;
+      out.push(r.text); lastY = r.y;
+    }
+    return out;
+  }
+
+  const ITEM_RE = /^(\d+)\s+(\S+)\s+(\d+(?:\.\d+)?)\s+([A-Za-z]+)\s+\$?([\d,]+\.\d+)\s+([A-Za-z]+)\s+\$?([\d,]+\.\d+)/;
+
+  function parsePage(items) {
+    const rows = toRows(items);
+    const po = {
+      poNumber: labelValue(items, "PO #"),
+      poDate: labelValue(items, "PO Date"),
+      via: labelValue(items, "Via"),
+      terms: labelValue(items, "Terms"),
+      shipTo: shipToLines(items),
+      lines: [], linesTotal: null, purchaseTotal: null,
+    };
+    for (let i = 0; i < rows.length; i++) {
+      const m = rows[i].text.match(ITEM_RE);
+      if (m) {
+        let desc = "";
+        const nx = rows[i + 1];
+        if (nx && !ITEM_RE.test(nx.text) && !/Lines Total/i.test(nx.text)) desc = nx.text;
+        po.lines.push({ lineNo: +m[1], productId: m[2], qty: m[3], unitPrice: m[5].replace(/,/g, ""), amount: m[7].replace(/,/g, ""), rawDescription: desc });
+        continue;
+      }
+      const lt = rows[i].text.match(/^(\d+)\s+Lines Total.*?Purchase Total:\s*\$?([\d,]+\.\d+)/i);
+      if (lt) { po.linesTotal = +lt[1]; po.purchaseTotal = +lt[2].replace(/,/g, ""); }
+    }
+    return po;
+  }
+
+  function fmtDate(d) {
+    const m = String(d).match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+    if (!m) return d;
+    const y = m[3].length === 2 ? "20" + m[3] : m[3];
+    return m[1].padStart(2, "0") + "/" + m[2].padStart(2, "0") + "/" + y;
+  }
+
+  const STREET_RE = /^(\d|P\.?\s*O\.?\s*Box|Box\s|RR\s|R\.R\.|HC\s|Rural Route|One\s|Two\s)/i;
+
+  // Merge per-page results into POs (a PO can continue onto a second page).
+  function buildOrders(pages) {
+    const map = new Map(); const order = [];
+    for (const p of pages) {
+      const key = p.poNumber || (order.length ? order[order.length - 1] : "UNKNOWN");
+      if (!map.has(key)) { map.set(key, { ...p, poNumber: key, lines: [] }); order.push(key); }
+      const po = map.get(key);
+      po.lines.push(...p.lines);
+      if (!po.shipTo.length && p.shipTo.length) po.shipTo = p.shipTo;
+      ["poDate", "via", "terms"].forEach(k => { if (!po[k] && p[k]) po[k] = p[k]; });
+      if (p.linesTotal != null) { po.linesTotal = p.linesTotal; po.purchaseTotal = p.purchaseTotal; }
+    }
+    return order.map(k => finalize(map.get(k)));
+  }
+
+  function finalize(po) {
+    const tags = [], warnings = [];
+    const st = po.shipTo.slice();
+    let cityIdx = -1;
+    for (let i = st.length - 1; i >= 0; i--) if (CITY_RE.test(st[i])) { cityIdx = i; break; }
+    let city = "", state = "", zip = "";
+    if (cityIdx >= 0) { const m = st[cityIdx].match(CITY_RE); city = m[1].trim(); state = m[2].toUpperCase(); zip = m[3]; }
+    else warnings.push("Could not find the City, ST ZIP line in Ship To");
+    const company = st[0] || "";
+    const middle = st.slice(1, cityIdx >= 0 ? cityIdx : st.length);
+
+    const ship = { ShipCompanyName: company, ShipFirstName: "", ShipLastName: "", ShipAddress1: "", ShipAddress2: "", ShipCity: city, ShipStateCode: state, ShipZipCode: zip, ShipCountry: "US", ShipPhone: "", ShipEmail: "" };
+    let billEmail;
+    if (/electronic\s*express/i.test(company)) {
+      const num = (company.match(/(\d{3,})\s*$/) || company.match(/(\d{3,})/) || [])[1] || "";
+      if (!num) warnings.push("Electronic Express order number not found in company line");
+      ship.ShipFirstName = "EE - " + num;
+      ship.ShipLastName = middle[0] || "";
+      ship.ShipAddress1 = middle.slice(1).join(" ");
+      ship.ShipAddress2 = "";
+      billEmail = EE_EMAIL;
+      tags.push("Electronic Express");
+      if (!ship.ShipLastName) warnings.push("No recipient name under the Electronic Express line");
+    } else {
+      if (middle.length && !STREET_RE.test(middle[0]) && middle.length > 1) {
+        ship.ShipAddress2 = middle[0];
+        ship.ShipAddress1 = middle.slice(1).join(" ");
+        tags.push("DBA → Address 2");
+      } else {
+        ship.ShipAddress1 = middle[0] || "";
+        ship.ShipAddress2 = middle.slice(1).join(" ");
+      }
+      billEmail = DEALER_EMAIL;
+      tags.push("Dealer drop-ship");
+    }
+    if (!ship.ShipAddress1) warnings.push("No street address found");
+
+    if (!po.lines.length) warnings.push("No line items found");
+    if (po.linesTotal != null && po.linesTotal !== po.lines.length) warnings.push(`PO says ${po.linesTotal} lines, found ${po.lines.length}`);
+    if (po.purchaseTotal != null) {
+      const sum = po.lines.reduce((s, l) => s + (+l.amount), 0);
+      if (Math.abs(sum - po.purchaseTotal) > 0.005) warnings.push(`Line amounts total ${sum.toFixed(2)} but PO total is ${po.purchaseTotal.toFixed(2)}`);
+    }
+    po.lines.forEach(l => { if (Math.abs(+l.qty * +l.unitPrice - +l.amount) > 0.005) warnings.push(`Line ${l.lineNo}: qty × price ≠ amount`); });
+
+    const base = { OrderID: po.poNumber, OrderDate: fmtDate(po.poDate), ...ship, ...BILL, BillEmail: billEmail, ShippingMethodRequested: po.via, PaymentTerm: po.terms };
+    const rows = po.lines.map(l => ({
+      ...base,
+      ProductID: l.productId,
+      ProductDescription: cleanDescription(l.rawDescription),
+      QtyPurchased: String(+l.qty),
+      UnitPrice: (+l.unitPrice).toFixed(2),
+    }));
+    return { poNumber: po.poNumber, shipToRaw: po.shipTo, tags, warnings, rows, total: po.purchaseTotal };
+  }
+
+  // fixed = {ShippingCarrierRequested, RushOrder, ShippingCost, Tax, ShipFromWarehouseName}
+  function toCSV(rows, fixed) {
+    const esc = v => { v = v == null ? "" : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    const out = [HEADERS.join(",")];
+    for (const r of rows) out.push(HEADERS.map(h => esc(h in (fixed || {}) && fixed[h] !== undefined ? fixed[h] : r[h])).join(","));
+    return out.join("\n") + "\n";
+  }
+
+  const api = { HEADERS, parsePage, buildOrders, toCSV, cleanDescription };
+  if (typeof module !== "undefined" && module.exports) module.exports = api; else root.POParser = api;
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
+(function(){
+  const P = window.POParser;
+  const FIXED_KEYS = [["ShippingCarrierRequested","Shipping carrier"],["RushOrder","Rush order"],["ShippingCost","Shipping cost"],["Tax","Tax"],["ShipFromWarehouseName","Ship-from warehouse"]];
+  let fixed = {};
+  try { fixed = JSON.parse(localStorage.getItem("po2csv.fixed") || "{}") || {}; } catch(e) { fixed = {}; }
+  const fixedEl = document.getElementById("fixed");
+  FIXED_KEYS.forEach(([k,label]) => {
+    const l = document.createElement("label"); l.className = "f";
+    l.innerHTML = `<span>${label} <code style="opacity:.6">${k}</code></span>`;
+    const inp = document.createElement("input"); inp.value = fixed[k] || "";
+    inp.addEventListener("input", () => { fixed[k] = inp.value; try{localStorage.setItem("po2csv.fixed", JSON.stringify(fixed));}catch(e){} render(); });
+    l.appendChild(inp); fixedEl.appendChild(l);
+  });
+
+  const state = { orders: [], files: new Set(), errors: [] };
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+  function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("show"),2200); }
+
+  async function readPdf(file){
+    const buf = await file.arrayBuffer();
+    const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf), isEvalSupported:false }).promise;
+    const pages = [];
+    for (let i=1;i<=doc.numPages;i++){
+      const tc = await (await doc.getPage(i)).getTextContent();
+      pages.push(P.parsePage(tc.items.map(t => ({ x:t.transform[4], y:t.transform[5], w:t.width, str:t.str }))));
+    }
+    return pages;
+  }
+
+  async function handle(files){
+    const pdfs = [...files].filter(f => /\.pdf$/i.test(f.name) || f.type === "application/pdf");
+    if (!pdfs.length) { toast("Those weren't PDF files"); return; }
+    for (const f of pdfs){
+      try {
+        const pages = await readPdf(f);
+        const orders = P.buildOrders(pages).filter(o => o.poNumber && o.poNumber !== "UNKNOWN" || o.rows.length);
+        if (!orders.length) { state.errors.push(`${f.name}: no purchase orders found (is this a scanned image?)`); continue; }
+        let dup = 0;
+        for (const o of orders){
+          if (state.orders.some(x => x.poNumber === o.poNumber)) { dup++; continue; }
+          o.source = f.name; state.orders.push(o);
+        }
+        if (dup) state.errors.push(`${f.name}: skipped ${dup} PO${dup>1?"s":""} already loaded`);
+        state.files.add(f.name);
+      } catch(e){
+        console.error(e); state.errors.push(`${f.name}: couldn't read this PDF (${e.message || e})`);
+      }
+    }
+    render();
+  }
+
+  function allRows(){ return state.orders.flatMap(o => o.rows); }
+  function csv(){ return P.toCSV(allRows(), Object.fromEntries(FIXED_KEYS.map(([k]) => [k, fixed[k] || ""]))); }
+
+  function render(){
+    const has = state.orders.length > 0;
+    $("bar").hidden = !has && !state.errors.length;
+    $("previewWrap").hidden = !has;
+    $("sFiles").textContent = state.files.size;
+    $("sPOs").textContent = state.orders.length;
+    $("sRows").textContent = allRows().length;
+    const nw = state.orders.filter(o => o.warnings.length).length;
+    $("sWarn").textContent = nw; $("sWarnBox").classList.toggle("bad", nw > 0);
+    $("dl").disabled = $("copy").disabled = !has;
+    $("errors").innerHTML = state.errors.map(e => `<div class="err">${esc(e)}</div>`).join("");
+    $("copybox").style.display = "none";
+
+    if (!has){ $("list").innerHTML = '<p class="empty">No POs loaded yet.</p>'; $("preview").innerHTML=""; return; }
+    $("list").innerHTML = state.orders.map(o => {
+      const r = o.rows[0] || {};
+      const tags = o.tags.map(t => `<span class="tag ${t==="Electronic Express"?"ee":""}">${esc(t==="Electronic Express"?"Electronic Express rule":t)}</span>`).join("");
+      const wtag = o.warnings.length ? `<span class="tag w">Check</span>` : "";
+      const name = [r.ShipFirstName, r.ShipLastName].filter(Boolean).join(" · ");
+      const total = o.rows.reduce((s,x)=>s + (+x.UnitPrice)*(+x.QtyPurchased), 0);
+      return `<div class="po ${o.warnings.length?"has-warn":""}">
+        <div class="po-h"><span class="id">${esc(o.poNumber)}</span><span class="co">${esc(r.ShipCompanyName || o.shipToRaw[0] || "")}</span>${tags}${wtag}<span class="src">${esc(r.OrderDate||"")} · ${esc(r.ShippingMethodRequested||"")} · ${esc(o.source)}</span></div>
+        ${o.warnings.length ? `<ul class="warns">${o.warnings.map(w=>`<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+        <div class="po-b">
+          <div class="addr">
+            ${name ? `<div class="k">First · Last</div><div>${esc(name)}</div>` : ""}
+            <div class="k">Ship to</div>
+            <div>${esc(r.ShipAddress1||"")}${r.ShipAddress2?`<br><span style="color:var(--muted)">Addr 2:</span> ${esc(r.ShipAddress2)}`:""}<br>${esc(r.ShipCity||"")}, ${esc(r.ShipStateCode||"")} ${esc(r.ShipZipCode||"")}</div>
+            <div class="k">Bill email</div><div>${esc(r.BillEmail||"")}</div>
+          </div>
+          <div class="lines"><table>
+            <thead><tr><th>Product</th><th>Description</th><th class="num">Qty</th><th class="num">Unit</th></tr></thead>
+            <tbody>${o.rows.map(x=>`<tr><td class="mono">${esc(x.ProductID)}</td><td>${esc(x.ProductDescription)}</td><td class="num">${esc(x.QtyPurchased)}</td><td class="num">${esc(x.UnitPrice)}</td></tr>`).join("")}
+            <tr><td></td><td style="color:var(--muted)">PO total</td><td></td><td class="num"><b>${total.toFixed(2)}</b></td></tr></tbody>
+          </table></div>
+        </div></div>`;
+    }).join("");
+
+    const lines = csv().trim().split("\n");
+    const parseLine = l => { const out=[]; let cur="", q=false; for (let i=0;i<l.length;i++){ const c=l[i]; if(q){ if(c==='"'&&l[i+1]==='"'){cur+='"';i++;} else if(c==='"') q=false; else cur+=c; } else if(c===','){out.push(cur);cur="";} else if(c==='"') q=true; else cur+=c; } out.push(cur); return out; };
+    const [h, ...body] = lines.map(parseLine);
+    $("preview").innerHTML = `<thead><tr>${h.map(x=>`<th>${esc(x)}</th>`).join("")}</tr></thead><tbody>${body.map(r=>`<tr>${r.map(x=>`<td>${esc(x)}</td>`).join("")}</tr>`).join("")}</tbody>`;
+  }
+
+  function fileName(){
+    const d = new Date(); const p = n => String(n).padStart(2,"0");
+    return `Sellercloud_POs_${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.csv`;
+  }
+
+  let downloads = null;
+  if (window.claude && typeof window.claude.use === "function") {
+    window.claude.use("downloads").then(d => { downloads = d; }).catch(() => {});
+  }
+
+  $("dl").addEventListener("click", async () => {
+    const data = csv();
+    if (downloads) {
+      try { await downloads.save({ filename: fileName(), data }); toast("CSV saved"); return; }
+      catch(e){ if (e && e.code === "declined") return; if (e && e.code === "rate_limited") { toast("A save prompt is already open"); return; } }
+    }
+    // Fallback when the page is opened outside the Claude viewer
+    try {
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([data], {type:"text/csv"})); a.download = fileName();
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch(e){ showCopyBox(data); toast("Download unavailable here — copy the CSV below"); }
+  });
+
+  function showCopyBox(data){ const b=$("copybox"); b.value=data; b.style.display="block"; b.focus(); b.select(); }
+  $("copy").addEventListener("click", async () => {
+    const data = csv();
+    try { await navigator.clipboard.writeText(data); toast("CSV copied"); }
+    catch(e){ showCopyBox(data); toast("Press Ctrl/⌘+C to copy"); }
+  });
+  $("clear").addEventListener("click", () => { state.orders=[]; state.files.clear(); state.errors=[]; render(); });
+
+  const drop = $("drop"), input = $("file");
+  drop.addEventListener("click", () => input.click());
+  drop.addEventListener("keydown", e => { if (e.key==="Enter"||e.key===" ") { e.preventDefault(); input.click(); } });
+  input.addEventListener("change", () => { handle(input.files); input.value=""; });
+  ["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => handle(e.dataTransfer.files));
+  window.addEventListener("dragover", e => e.preventDefault());
+  window.addEventListener("drop", e => { e.preventDefault(); if (e.target !== drop && !drop.contains(e.target)) handle(e.dataTransfer.files); });
+
+  if (!window.pdfjsLib) { $("errors").innerHTML = '<div class="err">The PDF reader failed to load. Check your connection and reload.</div>'; }
+  render();
+})();
+</script>
+</body>
+</html>
